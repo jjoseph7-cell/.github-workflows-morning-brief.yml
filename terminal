@@ -1,0 +1,11 @@
+cd "/Users/josejoseph/Downloads/Brief_files"
+mkdir -p .github/workflows
+mv morning-brief.yml .github/workflows/morning-brief.yml
+
+git init
+git add .
+git commit -m "Morning brief agent"
+# create an empty repo on github.com first (e.g. named "morning-brief"), then:
+git branch -M main
+git remote add origin https://github.com/<your-username>/morning-brief.git
+git push -u origin main
