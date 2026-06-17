@@ -1,0 +1,58 @@
+name: Morning Brief
+
+on:
+  schedule:
+    - cron: "0 13 * * *"
+    - cron: "0 14 * * *"
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+jobs:
+  brief:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+      RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+      EMAIL_FROM: ${{ secrets.EMAIL_FROM }}
+      EMAIL_TO: ${{ secrets.EMAIL_TO }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Gate to 08:00 America/Chicago
+        id: gate
+        run: '[ "${{ github.event_name }}" = schedule ] && [ "$(TZ=America/Chicago date +%H)" != 08 ] && echo "skip=true" >> "$GITHUB_OUTPUT" || true'
+
+      - name: Set up Node
+        if: steps.gate.outputs.skip != 'true'
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install Claude Code CLI
+        if: steps.gate.outputs.skip != 'true'
+        run: npm install -g @anthropic-ai/claude-code
+
+      - name: Set up Python
+        if: steps.gate.outputs.skip != 'true'
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install Python dependencies
+        if: steps.gate.outputs.skip != 'true'
+        run: pip install -r requirements.txt
+
+      - name: Generate and email the brief
+        if: steps.gate.outputs.skip != 'true'
+        run: python run_brief.py
+
+      - name: Archive the brief to the repo
+        if: steps.gate.outputs.skip != 'true'
+        run: 'git config user.name morning-brief-bot; git config user.email actions@users.noreply.github.com; git add briefs/; git commit -m "brief $(TZ=America/Chicago date +%F)" || true; git push'
