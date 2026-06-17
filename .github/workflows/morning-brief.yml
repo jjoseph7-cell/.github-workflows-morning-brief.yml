@@ -1,0 +1,66 @@
+name: Morning Brief
+
+on:
+  schedule:
+    - cron: "0 13 * * *"   # 08:00 America/Chicago during CDT (summer)
+    - cron: "0 14 * * *"   # 08:00 America/Chicago during CST (winter)
+  workflow_dispatch: {}     # lets you run it manually any time (ignores the 8am gate)
+
+permissions:
+  contents: write           # needed to commit the archived brief back to the repo
+
+jobs:
+  brief:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Gate to 08:00 Chicago (skip the off-DST trigger)
+        id: gate
+        run: |
+          HOUR=$(TZ="America/Chicago" date +%H)
+          echo "Chicago hour: $HOUR (event: ${{ github.event_name }})"
+          if [ "${{ github.event_name }}" = "schedule" ] && [ "$HOUR" != "08" ]; then
+            echo "Off-hour scheduled trigger due to DST; skipping this run."
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Set up Node
+        if: steps.gate.outputs.skip != 'true'
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install Claude Code CLI
+        if: steps.gate.outputs.skip != 'true'
+        run: npm install -g @anthropic-ai/claude-code
+
+      - name: Set up Python
+        if: steps.gate.outputs.skip != 'true'
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install Python dependencies
+        if: steps.gate.outputs.skip != 'true'
+        run: pip install -r requirements.txt
+
+      - name: Generate and email the brief
+        if: steps.gate.outputs.skip != 'true'
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+          EMAIL_FROM: ${{ secrets.EMAIL_FROM }}
+          EMAIL_TO: ${{ secrets.EMAIL_TO }}
+        run: python run_brief.py
+
+      - name: Archive the brief to the repo
+        if: steps.gate.outputs.skip != 'true'
+        run: |
+          git config user.name "morning-brief-bot"
+          git config user.email "actions@users.noreply.github.com"
+          git add briefs/
+          git commit -m "Brief $(TZ='America/Chicago' date +%F)" || echo "Nothing to commit"
+          git push
