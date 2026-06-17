@@ -16,6 +16,11 @@ jobs:
   brief:
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    env:
+      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+      RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+      EMAIL_FROM: ${{ secrets.EMAIL_FROM }}
+      EMAIL_TO: ${{ secrets.EMAIL_TO }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -44,4 +49,10 @@ jobs:
         if: steps.gate.outputs.skip != 'true'
         run: pip install -r requirements.txt
 
-      - name: Generate and email th
+      - name: Generate and email the brief
+        if: steps.gate.outputs.skip != 'true'
+        run: python run_brief.py
+
+      - name: Archive the brief to the repo
+        if: steps.gate.outputs.skip != 'true'
+        run: 'git config user.name morning-brief-bot; git config user.email actions@users.noreply.github.com; git add briefs/; git commit -m "brief $(TZ=America/Chicago date +%F)" || true; git push'
