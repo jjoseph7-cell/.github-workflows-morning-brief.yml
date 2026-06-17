@@ -8,6 +8,24 @@ on:
 
 permissions:
   contents: write           # needed to commit the archived brief back to the repo
+name: Morning Brief
+
+on:
+  schedule:
+    - cron: "0 13 * * *"   # 08:00 America/Chicago during CDT (summer)
+    - cron: "0 14 * * *"   # 08:00 America/Chicago during CST (winter)
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true   # <-- add this block
+
+jobs:
+  brief:
+    runs-on: ubuntu-latest
+    ...
 
 jobs:
   brief:
